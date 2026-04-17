@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
-  loadAppointments, updateAppointmentStatus, deleteAppointment,
-  uploadFile,
-  addGalleryItem, loadGalleryItems, deleteGalleryItem,
-  addTransformation, loadTransformations, deleteTransformation,
+  loadAppointments, updateAppointmentStatus, deleteAppointment
 } from '../services/supabase'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -16,13 +13,12 @@ function lsSet(key, val) {
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
-function Dashboard({ totalAppts, totalGallery, totalTransformations }) {
-  const totalMedia = totalGallery + totalTransformations * 2
+function Dashboard({ totalAppts, totalGallery, totalWorkplace }) {
   const cards = [
     { icon: 'fa-calendar-check', label: 'Appointments',    value: totalAppts },
-    { icon: 'fa-images',         label: 'Gallery Items',   value: totalGallery },
-    { icon: 'fa-magic',          label: 'Transformations', value: totalTransformations },
-    { icon: 'fa-photo-video',    label: 'Total Media Files', value: totalMedia },
+    { icon: 'fa-images',         label: 'Our Work',        value: totalGallery },
+    { icon: 'fa-building',       label: 'Workplace',       value: totalWorkplace },
+    { icon: 'fa-photo-video',    label: 'Total Media',     value: totalGallery + totalWorkplace },
   ]
   return (
     <div>
@@ -45,9 +41,9 @@ function Dashboard({ totalAppts, totalGallery, totalTransformations }) {
         </h3>
         <ul style={{ color: '#9D7A5A', lineHeight: 2, paddingLeft: '1.5rem', margin: 0 }}>
           <li><strong>Appointments:</strong> View and manage all appointment booking requests</li>
-          <li><strong>Gallery Management:</strong> Upload photos and videos to showcase your salon work and services</li>
-          <li><strong>Transformations:</strong> Upload before &amp; after photos to show client transformations</li>
-          <li><strong>File Support:</strong> Images (JPG, PNG, GIF, WEBP) and Videos (MP4, WEBM)</li>
+          <li><strong>Our Work:</strong> Upload photos to showcase your salon work and services</li>
+          <li><strong>Workplace:</strong> Upload photos of your salon interior</li>
+          <li><strong>File Support:</strong> Images (JPG, PNG, GIF, WEBP)</li>
           <li><strong>Storage:</strong> All media is uploaded to Supabase Storage and data saved to Supabase DB</li>
           <li><strong>Tip:</strong> Add descriptive titles and descriptions for better presentation</li>
         </ul>
@@ -182,290 +178,100 @@ function Appointments() {
   )
 }
 
-function GalleryManager() {
+function LocalGalleryManager({ storageKey, title, icon }) {
   const [items, setItems] = useState([])
   const [formState, setFormState] = useState({ title: '', description: '' })
   const [preview, setPreview] = useState(null)
-  const [previewType, setPreviewType] = useState('image')
-  const [file, setFile] = useState(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState('')
+  
+  useEffect(() => {
+    setItems(lsGet(storageKey))
+  }, [storageKey])
 
-  useEffect(() => { fetchItems() }, [])
-
-  async function fetchItems() {
-    const res = await loadGalleryItems()
-    if (res.success) setItems(res.data)
-  }
-
-  function handleFormChange(e) { setFormState((p) => ({ ...p, [e.target.name]: e.target.value })) }
+  function handleFormChange(e) { setFormState(p => ({ ...p, [e.target.name]: e.target.value })) }
 
   function handleFile(e) {
     const f = e.target.files[0]
     if (!f) return
-    setFile(f)
-    setPreviewType(f.type.startsWith('video/') ? 'video' : 'image')
     const reader = new FileReader()
-    reader.onload = (ev) => setPreview(ev.target.result)
+    reader.onload = ev => setPreview(ev.target.result)
     reader.readAsDataURL(f)
   }
 
-  async function handleAdd(e) {
+  function handleAdd(e) {
     e.preventDefault()
-    if (!file || !formState.title) return
-    setUploading(true)
-    setUploadError('')
-    try {
-      const fileUrl = await uploadFile('gallery', file)
-      const res = await addGalleryItem({
-        title: formState.title,
-        description: formState.description,
-        file_url: fileUrl,
-        file_type: file.type,
-      })
-      if (!res.success) throw new Error(res.error)
-      await fetchItems()
-      setFormState({ title: '', description: '' })
-      setFile(null)
-      setPreview(null)
-      e.target.reset()
-    } catch (err) {
-      setUploadError(err.message || 'Upload failed. Check Supabase storage bucket "gallery" is public.')
-    } finally {
-      setUploading(false)
+    if (!preview) return
+    
+    const newItem = {
+      id: Date.now().toString(),
+      title: formState.title,
+      description: formState.description,
+      file_url: preview,
+      created_at: new Date().toISOString()
     }
+    
+    const newItems = [newItem, ...items]
+    lsSet(storageKey, newItems)
+    setItems(newItems)
+    
+    setFormState({ title: '', description: '' })
+    setPreview(null)
+    e.target.reset()
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('Delete this gallery item?')) return
-    await deleteGalleryItem(id)
-    fetchItems()
+  function handleDelete(id) {
+    if (!window.confirm('Delete this photo?')) return
+    const newItems = items.filter(i => i.id !== id)
+    lsSet(storageKey, newItems)
+    setItems(newItems)
   }
 
   return (
     <div>
       <div style={{ background: '#FFFFFF', padding: '2rem', borderRadius: '10px', marginBottom: '2rem', border: '2px dashed #B8936E' }}>
         <h3 style={{ color: '#8B7355', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <i className="fas fa-cloud-upload-alt" style={{ color: '#B8936E' }}></i> Upload New Gallery Item
+          <i className={`fas ${icon}`} style={{ color: '#B8936E' }}></i> Upload New {title} Photo
         </h3>
-        <div style={{ background: '#e7f4e7', borderLeft: '4px solid #5cb85c', padding: '1rem', marginBottom: '1.5rem', borderRadius: '5px' }}>
-          <i className="fas fa-info-circle" style={{ color: '#5cb85c', marginRight: '0.5rem' }}></i>
-          <strong style={{ color: '#3c763d' }}>Your uploads will be saved to Supabase and appear in the Gallery section!</strong>
-        </div>
-        {uploadError && (
-          <div style={{ background: '#fee', color: '#c33', border: '1px solid #fcc', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
-            <i className="fas fa-exclamation-circle" style={{ marginRight: '0.5rem' }}></i>{uploadError}
-          </div>
-        )}
+        
         <form onSubmit={handleAdd}>
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>Title *</label>
-            <input type="text" name="title" value={formState.title} onChange={handleFormChange} placeholder="e.g., Professional Haircut" required
+            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>Title</label>
+            <input type="text" name="title" value={formState.title} onChange={handleFormChange} placeholder="e.g., Professional Haircut"
               style={{ width: '100%', padding: '12px', border: '2px solid #E8D5C4', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
           </div>
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>Description</label>
-            <input type="text" name="description" value={formState.description} onChange={handleFormChange} placeholder="Brief description of this work..."
-              style={{ width: '100%', padding: '12px', border: '2px solid #E8D5C4', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
-          </div>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>Upload Image or Video *</label>
-            <input type="file" accept="image/*,video/*" onChange={handleFile} required
+            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>Upload Image *</label>
+            <input type="file" accept="image/*" onChange={handleFile} required
               style={{ width: '100%', padding: '12px', border: '2px dashed #B8936E', borderRadius: '8px', background: '#F5E6D3', boxSizing: 'border-box', cursor: 'pointer' }} />
             {preview && (
-              <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ position: 'relative', width: '150px', height: '150px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #B8936E' }}>
-                  {previewType === 'video'
-                    ? <video src={preview} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : <img src={preview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                </div>
+              <div style={{ marginTop: '1rem' }}>
+                <img src={preview} alt="Preview" style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '2px solid #B8936E' }} />
               </div>
             )}
           </div>
-          <button type="submit" disabled={uploading} style={{ background: uploading ? '#ccc' : 'linear-gradient(135deg, #B8936E, #9D7A5A)', color: '#F5E6D3', padding: '12px 30px', border: 'none', borderRadius: '25px', fontWeight: 'bold', cursor: uploading ? 'not-allowed' : 'pointer', fontSize: '1rem' }}>
-            <i className={`fas ${uploading ? 'fa-spinner fa-spin' : 'fa-plus-circle'}`} style={{ marginRight: '0.5rem' }}></i>
-            {uploading ? 'Uploading…' : 'Add to Gallery'}
+          <button type="submit" style={{ background: 'linear-gradient(135deg, #B8936E, #9D7A5A)', color: '#F5E6D3', padding: '12px 30px', border: 'none', borderRadius: '25px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem' }}>
+            <i className="fas fa-plus-circle" style={{ marginRight: '0.5rem' }}></i> Add to {title}
           </button>
         </form>
       </div>
 
       <div>
         <h3 style={{ color: '#8B7355', marginBottom: '1rem' }}>
-          <i className="fas fa-layer-group" style={{ marginRight: '0.5rem' }}></i> Current Gallery Items
+          <i className="fas fa-layer-group" style={{ marginRight: '0.5rem' }}></i> Current {title} Photos
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
           {items.map((item) => (
-            <div key={item.id} style={{ background: '#FFFFFF', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 3px 10px rgba(0,0,0,0.1)', transition: 'all 0.3s ease' }}>
-              {item.file_type && item.file_type.startsWith('video/')
-                ? <video src={item.file_url} style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block' }} />
-                : <img src={item.file_url} alt={item.title || ''} style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block' }} />}
+            <div key={item.id} style={{ background: '#FFFFFF', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 3px 10px rgba(0,0,0,0.1)' }}>
+              <img src={item.file_url} alt={item.title || ''} style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block' }} />
               <div style={{ padding: '1rem' }}>
-                <h4 style={{ color: '#8B7355', margin: '0 0 0.5rem 0', fontSize: '1rem' }}>{item.title}</h4>
-                {item.description && <p style={{ color: '#9D7A5A', margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>{item.description}</p>}
-                <button onClick={() => handleDelete(item.id)} style={{ background: '#d9534f', color: 'white', padding: '8px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                {item.title && <h4 style={{ color: '#8B7355', margin: '0 0 0.5rem 0', fontSize: '1rem' }}>{item.title}</h4>}
+                <button onClick={() => handleDelete(item.id)} style={{ background: '#d9534f', color: 'white', padding: '8px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                   <i className="fas fa-trash" style={{ marginRight: '0.4rem' }}></i> Delete
                 </button>
               </div>
             </div>
           ))}
         </div>
-        {items.length === 0 && <p style={{ color: '#9D7A5A', textAlign: 'center', padding: '3rem' }}>No gallery items yet.</p>}
-      </div>
-    </div>
-  )
-}
-
-function TransformationsManager() {
-  const [items, setItems] = useState([])
-  const [form, setForm] = useState({ title: '', description: '', category: '' })
-  const [beforeFile, setBeforeFile] = useState(null)
-  const [afterFile, setAfterFile] = useState(null)
-  const [beforePreview, setBeforePreview] = useState(null)
-  const [afterPreview, setAfterPreview] = useState(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState('')
-
-  useEffect(() => { fetchItems() }, [])
-
-  async function fetchItems() {
-    const res = await loadTransformations()
-    if (res.success) setItems(res.data)
-  }
-
-  function handleFormChange(e) { setForm((p) => ({ ...p, [e.target.name]: e.target.value })) }
-
-  function handleBefore(e) {
-    const f = e.target.files[0]; if (!f) return; setBeforeFile(f)
-    const r = new FileReader(); r.onload = (ev) => setBeforePreview(ev.target.result); r.readAsDataURL(f)
-  }
-  function handleAfter(e) {
-    const f = e.target.files[0]; if (!f) return; setAfterFile(f)
-    const r = new FileReader(); r.onload = (ev) => setAfterPreview(ev.target.result); r.readAsDataURL(f)
-  }
-
-  async function handleAdd(e) {
-    e.preventDefault()
-    if (!beforeFile || !afterFile || !form.title) return
-    setUploading(true)
-    setUploadError('')
-    try {
-      const [beforeUrl, afterUrl] = await Promise.all([
-        uploadFile('transformations', beforeFile),
-        uploadFile('transformations', afterFile),
-      ])
-      const res = await addTransformation({
-        title: form.title,
-        description: form.description,
-        category: form.category,
-        before_url: beforeUrl,
-        after_url: afterUrl,
-      })
-      if (!res.success) throw new Error(res.error)
-      await fetchItems()
-      setForm({ title: '', description: '', category: '' })
-      setBeforeFile(null); setAfterFile(null); setBeforePreview(null); setAfterPreview(null)
-      e.target.reset()
-    } catch (err) {
-      setUploadError(err.message || 'Upload failed. Check Supabase storage bucket "transformations" is public.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  async function handleDelete(id) {
-    if (!window.confirm('Delete this transformation?')) return
-    await deleteTransformation(id)
-    fetchItems()
-  }
-
-  return (
-    <div>
-      <div style={{ background: '#FFFFFF', padding: '2rem', borderRadius: '10px', marginBottom: '2rem', border: '2px dashed #B8936E' }}>
-        <h3 style={{ color: '#8B7355', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <i className="fas fa-magic" style={{ color: '#B8936E' }}></i> Upload New Transformation
-        </h3>
-        <div style={{ background: '#e7f4e7', borderLeft: '4px solid #5cb85c', padding: '1rem', marginBottom: '1.5rem', borderRadius: '5px' }}>
-          <i className="fas fa-info-circle" style={{ color: '#5cb85c', marginRight: '0.5rem' }}></i>
-          <strong style={{ color: '#3c763d' }}>Your transformations will be saved to Supabase and appear in the Transformations section!</strong>
-        </div>
-        {uploadError && (
-          <div style={{ background: '#fee', color: '#c33', border: '1px solid #fcc', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
-            <i className="fas fa-exclamation-circle" style={{ marginRight: '0.5rem' }}></i>{uploadError}
-          </div>
-        )}
-        <form onSubmit={handleAdd}>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>Transformation Title *</label>
-            <input type="text" name="title" value={form.title} onChange={handleFormChange} placeholder="e.g. Hair Color & Style Transformation" required
-              style={{ width: '100%', padding: '12px', border: '2px solid #E8D5C4', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
-          </div>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>Description *</label>
-            <textarea name="description" value={form.description} onChange={handleFormChange} placeholder="Describe the transformation..." rows="3" required
-              style={{ width: '100%', padding: '12px', border: '2px solid #E8D5C4', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box', resize: 'vertical' }} />
-          </div>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>Before Image *</label>
-            <input type="file" accept="image/*" onChange={handleBefore} required
-              style={{ width: '100%', padding: '12px', border: '2px dashed #B8936E', borderRadius: '8px', background: '#F5E6D3', boxSizing: 'border-box', cursor: 'pointer' }} />
-            {beforePreview && (
-              <div style={{ marginTop: '1rem' }}>
-                <div style={{ position: 'relative', width: '150px', height: '150px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #B8936E' }}>
-                  <img src={beforePreview} alt="Before preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              </div>
-            )}
-          </div>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', color: '#8B7355', fontWeight: 'bold', marginBottom: '0.5rem' }}>After Image *</label>
-            <input type="file" accept="image/*" onChange={handleAfter} required
-              style={{ width: '100%', padding: '12px', border: '2px dashed #B8936E', borderRadius: '8px', background: '#F5E6D3', boxSizing: 'border-box', cursor: 'pointer' }} />
-            {afterPreview && (
-              <div style={{ marginTop: '1rem' }}>
-                <div style={{ position: 'relative', width: '150px', height: '150px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #B8936E' }}>
-                  <img src={afterPreview} alt="After preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              </div>
-            )}
-          </div>
-          <button type="submit" disabled={uploading} style={{ background: uploading ? '#ccc' : 'linear-gradient(135deg, #B8936E, #9D7A5A)', color: '#F5E6D3', padding: '12px 30px', border: 'none', borderRadius: '25px', fontWeight: 'bold', cursor: uploading ? 'not-allowed' : 'pointer', fontSize: '1rem' }}>
-            <i className={`fas ${uploading ? 'fa-spinner fa-spin' : 'fa-plus-circle'}`} style={{ marginRight: '0.5rem' }}></i>
-            {uploading ? 'Uploading…' : 'Add Transformation'}
-          </button>
-        </form>
-      </div>
-
-      <div>
-        <h3 style={{ color: '#8B7355', marginBottom: '1rem' }}>
-          <i className="fas fa-layer-group" style={{ marginRight: '0.5rem' }}></i> Current Transformations
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
-          {items.map((item) => (
-            <div key={item.id} style={{ background: '#FFFFFF', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 3px 10px rgba(0,0,0,0.1)', transition: 'all 0.3s ease', position: 'relative' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                <div style={{ position: 'relative' }}>
-                  <img src={item.before_url} alt="Before" style={{ width: '100%', height: '150px', objectFit: 'cover', display: 'block' }} />
-                  <span style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px' }}>Before</span>
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <img src={item.after_url} alt="After" style={{ width: '100%', height: '150px', objectFit: 'cover', display: 'block' }} />
-                  <span style={{ position: 'absolute', bottom: '6px', right: '6px', background: '#B8936E', color: '#fff', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px' }}>After</span>
-                </div>
-              </div>
-              <div style={{ padding: '1rem' }}>
-                <h4 style={{ color: '#8B7355', margin: '0 0 0.5rem 0', fontSize: '1rem' }}>{item.title}</h4>
-                {item.description && <p style={{ color: '#9D7A5A', margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>{item.description}</p>}
-                {item.category && <span style={{ display: 'inline-block', padding: '2px 10px', background: '#F5E6D3', color: '#B8936E', borderRadius: '12px', fontSize: '0.8rem' }}>{item.category}</span>}
-                <div style={{ marginTop: '0.75rem' }}>
-                  <button onClick={() => handleDelete(item.id)} style={{ background: '#d9534f', color: 'white', padding: '8px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                    <i className="fas fa-trash" style={{ marginRight: '0.4rem' }}></i> Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        {items.length === 0 && <p style={{ color: '#9D7A5A', textAlign: 'center', padding: '3rem' }}>No transformations yet.</p>}
+        {items.length === 0 && <p style={{ color: '#9D7A5A', textAlign: 'center', padding: '3rem' }}>No photos yet.</p>}
       </div>
     </div>
   )
@@ -475,8 +281,8 @@ function TransformationsManager() {
 const TABS = [
   { id: 'dashboard',        label: 'Dashboard',       icon: 'fa-chart-line' },
   { id: 'appointments',     label: 'Appointments',    icon: 'fa-calendar-check' },
-  { id: 'gallery',          label: 'Gallery',         icon: 'fa-images' },
-  { id: 'transformations',  label: 'Transformations', icon: 'fa-magic' },
+  { id: 'our_work',         label: 'Our Work',        icon: 'fa-images' },
+  { id: 'workplace',        label: 'Workplace',       icon: 'fa-building' },
 ]
 
 export default function Admin() {
@@ -484,8 +290,8 @@ export default function Admin() {
   const navigate = useNavigate()
 
   const [totalAppts, setTotalAppts] = useState(0)
-  const [totalGallery, setTotalGallery] = useState(0)
-  const [totalTransformations, setTotalTransformations] = useState(0)
+  const [totalGallery, setTotalGallery] = useState(lsGet('jj_salon_work_photos').length)
+  const [totalWorkplace, setTotalWorkplace] = useState(lsGet('jj_salon_workplace_photos').length)
   useEffect(() => {
     document.title = "Admin Panel - JJ's Salon"
     if (localStorage.getItem('adminLoggedIn') !== 'true') {
@@ -497,8 +303,8 @@ export default function Admin() {
 
   async function refreshStats() {
     loadAppointments().then((res) => { if (res.success) setTotalAppts(res.data.length) })
-    loadGalleryItems().then((res) => { if (res.success) setTotalGallery(res.data.length) })
-    loadTransformations().then((res) => { if (res.success) setTotalTransformations(res.data.length) })
+    setTotalGallery(lsGet('jj_salon_work_photos').length)
+    setTotalWorkplace(lsGet('jj_salon_workplace_photos').length)
   }
 
   function handleLogout() {
@@ -550,12 +356,12 @@ export default function Admin() {
             <Dashboard
               totalAppts={totalAppts}
               totalGallery={totalGallery}
-              totalTransformations={totalTransformations}
+              totalWorkplace={totalWorkplace}
             />
           )}
           {activeTab === 'appointments'    && <Appointments />}
-          {activeTab === 'gallery'         && <GalleryManager />}
-          {activeTab === 'transformations' && <TransformationsManager />}
+          {activeTab === 'our_work'        && <LocalGalleryManager storageKey="jj_salon_work_photos" title="Our Work" icon="fa-images" />}
+          {activeTab === 'workplace'       && <LocalGalleryManager storageKey="jj_salon_workplace_photos" title="Workplace" icon="fa-building" />}
         </div>
 
       </div>

@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
+const MARQUEE_ITEMS = Array(8).fill(
+  ['Premium Beauty', 'Hair Styling', 'Bridal Makeup', 'Skin Care', 'Nail Art', 'JJ Salon Pune']
+).flat()
+
 export default function Home() {
   useEffect(() => {
     document.title = "JJ's Salon - Premium Hair & Beauty Services"
@@ -10,6 +14,13 @@ export default function Home() {
     <main>
       {/* ── Hero ──────────────────────────────────────────── */}
       <section className="hero">
+        <div className="marquee-strip" style={{ top: '72px', bottom: 'auto', zIndex: 10 }}>
+          <div className="marquee-inner">
+            {MARQUEE_ITEMS.map((item, i) => (
+              <span key={i}>{item}</span>
+            ))}
+          </div>
+        </div>
         <div className="container hero-inner">
           {/* Left: text */}
           <div className="hero-text">
@@ -42,7 +53,7 @@ export default function Home() {
         {/* Stats strip */}
         <div className="hero-stats">
           {[
-            { num: '1000+', label: 'Happy Clients', i: 0 },
+            { num: '500+', label: 'Happy Clients', i: 0 },
             { num: '1',   label: 'Years Active',  i: 1 },
             { num: '250+',  label: '5-Star Reviews', i: 2 },
             { num: '50+',    label: 'Services',       i: 3 },
@@ -100,7 +111,7 @@ export default function Home() {
               {/* Stat pills */}
               <div className="stat-pills">
                 {[
-                  { icon: 'fa-users',  num: '1000+', label: 'Clients' },
+                  { icon: 'fa-users',  num: '500+', label: 'Clients' },
                   { icon: 'fa-star',   num: '250+',  label: '5-Star Reviews' },
                 ].map(s => (
                   <div key={s.label} className="stat-pill">

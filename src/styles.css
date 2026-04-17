@@ -1,4 +1,4 @@
-﻿/* ─── Reset & Base ─────────────────────────────────────────── */
+/* ─── Reset & Base ─────────────────────────────────────────── */
 *, *::before, *::after {
   margin: 0;
   padding: 0;
@@ -1589,3 +1589,57 @@ footer::before {
 .stat-item, .info-item, .bento-card { }
 
 /* ─── Admin pages keep basic dark (no special overrides needed) */
+
+/* Image Modal */
+.image-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(14, 12, 10, 0.95);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  cursor: pointer;
+}
+
+.image-modal-content {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--gold-border);
+  cursor: default;
+}
+
+.image-modal-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: var(--text-2);
+  font-size: 44px;
+  font-weight: 300;
+  cursor: pointer;
+  z-index: 10001;
+  transition: color 0.3s;
+}
+
+.image-modal-close:hover {
+  color: var(--gold);
+}
+
+.clickable-image {
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.clickable-image:hover {
+  transform: scale(1.03);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  z-index: 5;
+  position: relative;
+}

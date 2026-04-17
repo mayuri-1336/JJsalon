@@ -406,11 +406,6 @@ export default function Services() {
         <div className="container">
           <p className="section-label" style={{ justifyContent: 'center' }}>What We Offer</p>
           <h2 className="section-title">Crafted for You</h2>
-          <p className="section-subtitle">Each service designed with care, using the finest products and techniques.</p>
-          <p className="section-subtitle" style={{ marginTop: '0.5rem', fontSize: '0.9rem', opacity: 0.75 }}>
-            <i className="fas fa-tag" style={{ marginRight: '6px' }}></i>
-            Prices shown as <strong>Member / Non-member</strong>. <strong>Members enjoy exclusive rates</strong> on all services.
-          </p>
 
           {/* Hair Services Section */}
           <div style={{ marginTop: '3rem', marginBottom: '2rem' }}>
